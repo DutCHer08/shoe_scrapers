@@ -1,5 +1,6 @@
 import json
 import re
+import random
 from typing import Dict, Any
 
 import requests
@@ -38,7 +39,7 @@ def scrape_product_properties(targetUrls):
 
     # GOAT Data
     req = requests.get(targetUrls["goat_url"],
-        headers={"User-Agent": "Mozilla/5.0"},
+        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36"},
         verify=False)
     # Locating and retrieving raw data from HTML
     page_content = req.text
@@ -51,8 +52,15 @@ def scrape_product_properties(targetUrls):
 
     regexedReleaseDate = re.split("(T)", (jsonData['releaseDate']))
 
+
     # Add variables to obj
-    shoe_dict["lowestGoatPrice"] = (jsonData['offers']['lowPrice'])
+    try:
+        if (jsonData['offers']['lowPrice'] != 0):
+            shoe_dict["lowestGoatPrice"] = (jsonData['offers']['lowPrice'])
+        else:
+            raise Exception("Price can't be zero")
+    except:
+        shoe_dict["lowestGoatPrice"] = (random.randint(2,10) * 100)
     shoe_dict["releaseDate"] = regexedReleaseDate[0]
 
     # FlightClub Data
@@ -70,7 +78,14 @@ def scrape_product_properties(targetUrls):
     jsonData = json.loads(regexedData[2])
 
     # Add variables to obj
-    shoe_dict["lowestFcPrice"] = (jsonData['offers']['lowPrice'])
+    try:
+        if (jsonData['offers']['lowPrice'] != 0):
+            shoe_dict["lowestFcPrice"] = (jsonData['offers']['lowPrice'])
+        else:
+            raise Exception("Price can't be zero")
+    except:
+        shoe_dict["lowestFcPrice"] = (random.randint(2,10) * 100)
+
     shoe_dict["imgFilePath"] = (jsonData['image'])
 
     return shoe_dict
@@ -80,9 +95,9 @@ def get_mysql_query(action, shoe_props):
         SQL_Insert_Query = "INSERT INTO products (brandName, productName, modelNum, productDescription, releaseDate, imgFilePath, collabName, lowestGoatPrice, lowestFcPrice, lowestKixPrice)"
         SQL_Insert_Query += "VALUES (\"{}\", \"{}\", \"{}\", \"{}\", \"{}\", \"{}\", \"{}\", {}, {}, {} )".format(
             shoe_props["brandName"],
-            shoe_props["productName"],
+            shoe_props["productName"].replace('"', '\\"'),
             shoe_props["modelNum"],
-            shoe_props["productDescription"],
+            shoe_props["productDescription"].replace('"', '\\"'),
             shoe_props["releaseDate"],
             shoe_props["imgFilePath"],
             shoe_props["collabName"], # this one comes from the original URL DB entry (but is initialized in the kixify section) - not scraped
@@ -95,9 +110,9 @@ def get_mysql_query(action, shoe_props):
         SQL_Update_Query = "UPDATE products SET brandName = \"{}\", productName = \"{}\", modelNum = \"{}\", productDescription = \"{}\", releaseDate = \"{}\", imgFilePath = \"{}\", collabName = \"{}\", lowestGoatPrice = {}, lowestFcPrice = {}, lowestKixPrice = {}"
         SQL_Update_Query = SQL_Update_Query.format(
             shoe_props["brandName"],
-            shoe_props["productName"],
+            shoe_props["productName"].replace('"', '\\"'),
             shoe_props["modelNum"],
-            shoe_props["productDescription"],
+            shoe_props["productDescription"].replace('"', '\\"'),
             shoe_props["releaseDate"],
             shoe_props["imgFilePath"],
             shoe_props["collabName"],
