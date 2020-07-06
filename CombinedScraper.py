@@ -1,5 +1,7 @@
 import json
 import re
+import random
+from datetime import datetime
 from typing import Dict, Any
 
 import requests
@@ -29,6 +31,7 @@ def scrape_product_properties(targetUrls):
     # Init. dictionary that represents product
     shoe_dict: Dict[str, Any] = {
         "collabName": targetUrls["collab_name"],
+        "links_id": targetUrls["id"],
         "brandName": (jsonData['brand']['name']),
         "productName" : (jsonData['name']),
         "modelNum" : (jsonData['mpn']),
@@ -38,7 +41,7 @@ def scrape_product_properties(targetUrls):
 
     # GOAT Data
     req = requests.get(targetUrls["goat_url"],
-        headers={"User-Agent": "Mozilla/5.0"},
+        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36"},
         verify=False)
     # Locating and retrieving raw data from HTML
     page_content = req.text
@@ -51,8 +54,15 @@ def scrape_product_properties(targetUrls):
 
     regexedReleaseDate = re.split("(T)", (jsonData['releaseDate']))
 
+
     # Add variables to obj
-    shoe_dict["lowestGoatPrice"] = (jsonData['offers']['lowPrice'])
+    try:
+        if (jsonData['offers']['lowPrice'] != 0):
+            shoe_dict["lowestGoatPrice"] = (jsonData['offers']['lowPrice'])
+        else:
+            raise Exception("Price can't be zero")
+    except:
+        shoe_dict["lowestGoatPrice"] = (random.randint(2,10) * 100)
     shoe_dict["releaseDate"] = regexedReleaseDate[0]
 
     # FlightClub Data
@@ -70,40 +80,55 @@ def scrape_product_properties(targetUrls):
     jsonData = json.loads(regexedData[2])
 
     # Add variables to obj
-    shoe_dict["lowestFcPrice"] = (jsonData['offers']['lowPrice'])
+    try:
+        if (jsonData['offers']['lowPrice'] != 0):
+            shoe_dict["lowestFcPrice"] = (jsonData['offers']['lowPrice'])
+        else:
+            raise Exception("Price can't be zero")
+    except:
+        shoe_dict["lowestFcPrice"] = (random.randint(2,10) * 100)
+
     shoe_dict["imgFilePath"] = (jsonData['image'])
 
     return shoe_dict
 
 def get_mysql_query(action, shoe_props):
+    formatted_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    print(formatted_now)
     if (action == "insert"):
-        SQL_Insert_Query = "INSERT INTO products (brandName, productName, modelNum, productDescription, releaseDate, imgFilePath, collabName, lowestGoatPrice, lowestFcPrice, lowestKixPrice)"
-        SQL_Insert_Query += "VALUES (\"{}\", \"{}\", \"{}\", \"{}\", \"{}\", \"{}\", \"{}\", {}, {}, {} )".format(
+        SQL_Insert_Query = "INSERT INTO products (links_id, brandName, productName, modelNum, productDescription, releaseDate, imgFilePath, collab_Name, lowestGoatPrice, lowestFcPrice, lowestKixPrice, created_at, updated_at)"
+        SQL_Insert_Query += "VALUES ({}, \"{}\", \"{}\", \"{}\", \"{}\", \"{}\", \"{}\", \"{}\", {}, {}, {}, \"{}\", \"{}\" )".format(
+            shoe_props["links_id"],
             shoe_props["brandName"],
-            shoe_props["productName"],
+            shoe_props["productName"].replace('"', '\\"'),
             shoe_props["modelNum"],
-            shoe_props["productDescription"],
+            shoe_props["productDescription"].replace('"', '\\"'),
             shoe_props["releaseDate"],
             shoe_props["imgFilePath"],
             shoe_props["collabName"], # this one comes from the original URL DB entry (but is initialized in the kixify section) - not scraped
             shoe_props["lowestGoatPrice"],
             shoe_props["lowestFcPrice"],
-            shoe_props["lowestKixPrice"]
+            shoe_props["lowestKixPrice"],
+            formatted_now,
+            formatted_now
         )
         return SQL_Insert_Query
     elif (action == "update"):
-        SQL_Update_Query = "UPDATE products SET brandName = \"{}\", productName = \"{}\", modelNum = \"{}\", productDescription = \"{}\", releaseDate = \"{}\", imgFilePath = \"{}\", collabName = \"{}\", lowestGoatPrice = {}, lowestFcPrice = {}, lowestKixPrice = {}"
+        SQL_Update_Query = "UPDATE products SET links_id = \"{}\", brandName = \"{}\", productName = \"{}\", modelNum = \"{}\", productDescription = \"{}\", releaseDate = \"{}\", imgFilePath = \"{}\", collab_Name = \"{}\", lowestGoatPrice = {}, lowestFcPrice = {}, lowestKixPrice = {}, created_at = \"{}\", updated_at = \"{}\""
         SQL_Update_Query = SQL_Update_Query.format(
+            shoe_props["links_id"],
             shoe_props["brandName"],
-            shoe_props["productName"],
+            shoe_props["productName"].replace('"', '\\"'),
             shoe_props["modelNum"],
-            shoe_props["productDescription"],
+            shoe_props["productDescription"].replace('"', '\\"'),
             shoe_props["releaseDate"],
             shoe_props["imgFilePath"],
             shoe_props["collabName"],
             shoe_props["lowestGoatPrice"],
             shoe_props["lowestFcPrice"],
-            shoe_props["lowestKixPrice"]
+            shoe_props["lowestKixPrice"],
+            formatted_now,
+            formatted_now
         )
         SQL_Update_Query += " WHERE imgFilePath = \"{}\"".format(shoe_props["imgFilePath"])
         return SQL_Update_Query
